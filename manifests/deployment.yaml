@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-drainer
+spec:
+  selector:
+    matchLabels:
+      app: node-drainer
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: node-drainer
+    spec:
+      serviceAccountName: node-drainer
+      securityContext:
+        sysctls:
+          # https://github.com/kubernetes/kubernetes/pull/54896
+          #- name: net.core.somaxconn
+          #  value: "65535"
+          - name: net.ipv4.ip_local_port_range
+            value: "10000 65535"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - node-drainer
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - name: controller
+          image: docker.pkg.github.com/kaidotdev/node-drainer/node-drainer:bc1b235
+          args:
+            - --concurrency=2
+            - --target-events=ContainerGCFailed,ImageGCFailed
+          imagePullPolicy: Always
