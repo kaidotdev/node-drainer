@@ -1,0 +1,10 @@
+namespace: node-drainer
+
+bases:
+  - ../manifests
+
+resources:
+  - namespace.yaml
+
+patchesStrategicMerge:
+  - deployment.yaml
