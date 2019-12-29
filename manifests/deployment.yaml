@@ -6,7 +6,7 @@ spec:
   selector:
     matchLabels:
       app: node-drainer
-  replicas: 1
+  replicas: 4
   strategy:
     rollingUpdate:
       maxSurge: 25%

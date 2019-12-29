@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"k8s.io/client-go/rest"
 
@@ -32,7 +38,10 @@ import (
 	"k8s.io/klog"
 )
 
-const controllerAgentName = "node-drainer"
+const (
+	controllerAgentName    = "node-drainer"
+	inClusterNamespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+)
 
 type Controller struct {
 	clientset    kubernetes.Interface
@@ -205,11 +214,53 @@ func main() {
 		klog.Fatalf("could not create kubernetes client: %s\n", err.Error())
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*10)
-	controller := NewController(clientset, informerFactory.Events().V1beta1().Events(), strings.Split(targetEvents, ","))
-	informerFactory.Start(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if err := controller.Run(concurrency, stopCh); err != nil {
-		klog.Fatalf("Error running controller: %s", err.Error())
+	id := uuid.New().String()
+	lock := &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name: controllerAgentName,
+			Namespace: func() string {
+				namespace, err := ioutil.ReadFile(inClusterNamespacePath)
+				if err != nil {
+					klog.Fatalf("unable to find leader election namespace: %v", err)
+				}
+				return string(namespace)
+			}(),
+		},
+		Client: clientset.CoordinationV1(),
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity: id,
+		},
 	}
+
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+		Lock:            lock,
+		ReleaseOnCancel: true,
+		LeaseDuration:   60 * time.Second,
+		RenewDeadline:   15 * time.Second,
+		RetryPeriod:     5 * time.Second,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*10)
+				controller := NewController(clientset, informerFactory.Events().V1beta1().Events(), strings.Split(targetEvents, ","))
+				informerFactory.Start(stopCh)
+
+				if err := controller.Run(concurrency, stopCh); err != nil {
+					klog.Fatalf("Error running controller: %s", err.Error())
+				}
+			},
+			OnStoppedLeading: func() {
+				klog.Infof("leader lost: %s", id)
+				os.Exit(0)
+			},
+			OnNewLeader: func(identity string) {
+				if identity == id {
+					return
+				}
+				klog.Infof("new leader elected: %s", identity)
+			},
+		},
+	})
 }
