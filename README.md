@@ -1,7 +1,5 @@
 # NodeDrainer
 
-:construction: **This repository is under development.**
-
 NodeDrainer is Kubernetes Component that drain a node the specified event occurred.
 
 ## Installation
@@ -33,4 +31,24 @@ evicting pod "storage-provisioner"
 evicting pod "node-drainer-645b59c6b9-6j8kk"
 evicting pod "registry-creds-n6rsk"
 evicting pod "coredns-5644d7b6d9-cpk2w"
+```
+
+## How to develop
+
+### `skaffold dev`
+
+```sh
+$ make dev
+```
+
+### Test
+
+```sh
+$ make test
+```
+
+### Lint
+
+```sh
+$ make lint
 ```
