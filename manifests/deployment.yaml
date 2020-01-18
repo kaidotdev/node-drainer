@@ -39,7 +39,7 @@ spec:
               weight: 100
       containers:
         - name: controller
-          image: docker.pkg.github.com/kaidotdev/node-drainer/node-drainer:bc1b235
+          image: docker.pkg.github.com/kaidotdev/node-drainer/node-drainer:v0.1.0
           args:
             - --concurrency=2
             - --target-events=ContainerGCFailed,ImageGCFailed
