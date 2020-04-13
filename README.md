@@ -33,6 +33,8 @@ evicting pod "registry-creds-n6rsk"
 evicting pod "coredns-5644d7b6d9-cpk2w"
 ```
 
+The events to be detected can be configured from [--target-events](https://github.com/kaidotdev/node-drainer/blob/v0.1.0/manifests/deployment.yaml#L45)
+
 ## How to develop
 
 ### `skaffold dev`
